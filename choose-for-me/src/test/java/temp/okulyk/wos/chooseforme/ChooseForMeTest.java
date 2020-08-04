@@ -3,6 +3,7 @@ package temp.okulyk.wos.chooseforme;
 import java.io.BufferedReader;
 import java.io.FileReader;
 import java.util.ArrayList;
+import java.util.HashSet;
 import java.util.List;
 
 import lombok.SneakyThrows;
@@ -25,7 +26,7 @@ public class ChooseForMeTest {
 
         List<Card> result = chooseForMe.findCards(cards, new RegularWheel(of(22)), new SpecialWheel(0));
 
-        assertEquals(result, readCards("test1.out"));
+        assertEquals(new HashSet<>(result), new HashSet<>(readCards("test1.out")));
     }
 
     @SneakyThrows

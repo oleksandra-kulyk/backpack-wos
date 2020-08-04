@@ -5,7 +5,7 @@ import lombok.Value;
 @Value
 public class Card {
     String cardName;
-    int rarity;
+    int price;
     CardType cardType;
     int duplicateNumber;
 }
