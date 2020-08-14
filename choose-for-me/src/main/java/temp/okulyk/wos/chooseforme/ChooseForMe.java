@@ -2,7 +2,9 @@ package temp.okulyk.wos.chooseforme;
 
 import java.util.ArrayList;
 import java.util.Collections;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 
 import temp.okulyk.wos.chooseforme.model.card.Card;
 import temp.okulyk.wos.chooseforme.model.wheel.RegularWheel;
@@ -19,7 +21,7 @@ public class ChooseForMe {
         int maxPrice = regularWheel.getPrices().stream().max(Integer::compareTo)
             .get();
 
-        int[][] possiblePrices = new int[maxPrice][cards.size()];
+        Map<Integer, Map<Integer, Integer>> possiblePrices = new HashMap<>();
 
         int bestPossiblePrice = 0;
         int cardsCountToTake = 0;
@@ -27,21 +29,21 @@ public class ChooseForMe {
             for (int currentPrice = 1; currentPrice <= maxPrice; currentPrice++) {
                 Card card = sortedCards.get(cardNumber);
                 if (cardNumber == 0) {
-                    if (card.getPrice() > currentPrice) {
-                        possiblePrices[currentPrice - 1][cardNumber] = 0;
-                    } else {
-                        possiblePrices[currentPrice - 1][cardNumber] = card.getPrice();
+                    if (card.getPrice() <= currentPrice) {
+                        HashMap<Integer, Integer> priceForCards = new HashMap<>();
+                        priceForCards.put(cardNumber, card.getPrice());
+                        possiblePrices.put(currentPrice, priceForCards);
                     }
                 } else {
-                    int doNotTake = possiblePrices[currentPrice - 1][cardNumber - 1];
+                    int doNotTake = safeGet(possiblePrices, currentPrice, cardNumber - 1);
                     int priceWithoutCurrentCard = currentPrice - card.getPrice();
                     if (priceWithoutCurrentCard > 0) {
-                        int take = possiblePrices[priceWithoutCurrentCard - 1][cardNumber - 1] + card.getPrice();
+                        int take = safeGet(possiblePrices, priceWithoutCurrentCard, cardNumber - 1) + card.getPrice();
                         bestPossiblePrice = Math.max(doNotTake, take);
                     } else {
                         bestPossiblePrice = doNotTake;
                     }
-                    possiblePrices[currentPrice - 1][cardNumber] = bestPossiblePrice;
+                    possiblePrices = safePut(possiblePrices, currentPrice, cardNumber, bestPossiblePrice);
                 }
             }
             if (bestPossiblePrice == maxPrice) {
@@ -52,8 +54,8 @@ public class ChooseForMe {
 
         System.out.println("Prices:");
         for (int card = 0; card < cards.size(); card++) {
-            for (int price = 0; price < maxPrice; price++) {
-                System.out.print(possiblePrices[price][card] + " ");
+            for (int price = 1; price < maxPrice; price++) {
+                System.out.print(safeGet(possiblePrices, price, card) + " ");
             }
             System.out.println();
         }
@@ -62,7 +64,7 @@ public class ChooseForMe {
             int leftPrice = bestPossiblePrice;
             List<Card> result = new ArrayList<>();
             while (leftPrice > 0) {
-                if (possiblePrices[bestPossiblePrice - 1][cardsCountToTake] != maxPrice) {
+                if (safeGet(possiblePrices, bestPossiblePrice, cardsCountToTake) != maxPrice) {
                     Card takenCard = cards.get(cardsCountToTake);
                     leftPrice -= takenCard.getPrice();
                     result.add(takenCard);
@@ -80,5 +82,20 @@ public class ChooseForMe {
             .sorted(comparing(Card::getDuplicateNumber, reverseOrder())
                 .thenComparing(Card::getPrice))
             .collect(toList());
+    }
+
+    private int safeGet(Map<Integer, Map<Integer, Integer>> possiblePrices, int price, int cardNumber) {
+        Map<Integer, Integer> priceForCards = possiblePrices.get(price);
+        if (priceForCards == null) {
+            return 0;
+        }
+        return priceForCards.getOrDefault(cardNumber, 0);
+    }
+
+    private Map<Integer, Map<Integer, Integer>> safePut(Map<Integer, Map<Integer, Integer>> possiblePrices, int price, int cardNumber, int priceToPut) {
+        Map<Integer, Integer> priceForCards = possiblePrices.getOrDefault(price, new HashMap<>());
+        priceForCards.put(cardNumber, priceToPut);
+        possiblePrices.put(price, priceForCards);
+        return possiblePrices;
     }
 }

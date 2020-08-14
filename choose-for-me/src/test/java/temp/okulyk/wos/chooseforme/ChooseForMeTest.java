@@ -22,13 +22,23 @@ public class ChooseForMeTest {
     private final ChooseForMe chooseForMe = new ChooseForMe();
 
     @Test
-    public void findCards() throws IOException {
+    public void regularWheel() throws IOException {
         List<String> lines = readLines("test1.in");
         List<Card> cards = readCards(lines, 2);
 
         List<Card> result = chooseForMe.findCards(cards, readRegularWheel(lines.get(0)), readSpecialWheel(lines.get(1)));
 
         assertEquals(new HashSet<>(result), new HashSet<>(readCards(readLines("test1.out"), 0)));
+    }
+
+    @Test
+    public void regularAndSpecialWheel() throws IOException {
+        List<String> lines = readLines("test2.in");
+        List<Card> cards = readCards(lines, 2);
+
+        List<Card> result = chooseForMe.findCards(cards, readRegularWheel(lines.get(0)), readSpecialWheel(lines.get(1)));
+
+        assertEquals(new HashSet<>(result), new HashSet<>(readCards(readLines("test2.out"), 0)));
     }
 
     private List<String> readLines(String fileName) throws IOException {
