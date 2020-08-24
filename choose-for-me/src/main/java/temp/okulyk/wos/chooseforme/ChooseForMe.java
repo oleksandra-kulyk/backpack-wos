@@ -5,6 +5,7 @@ import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 
 import temp.okulyk.wos.chooseforme.model.card.Card;
 import temp.okulyk.wos.chooseforme.model.wheel.RegularWheel;
@@ -13,6 +14,7 @@ import temp.okulyk.wos.chooseforme.model.wheel.SpecialWheel;
 import static java.util.Comparator.comparing;
 import static java.util.Comparator.reverseOrder;
 import static java.util.stream.Collectors.toList;
+import static temp.okulyk.wos.chooseforme.model.card.CardType.REGULAR;
 
 public class ChooseForMe {
     public List<Card> findCards(List<Card> cards, RegularWheel regularWheel, SpecialWheel specialWheel) {
@@ -21,7 +23,7 @@ public class ChooseForMe {
         int maxPrice = regularWheel.getPrices().stream().max(Integer::compareTo)
             .get();
 
-        Map<Integer, Map<Integer, Integer>> possiblePrices = new HashMap<>();
+        Map<Integer, Map<Integer, Map<Integer, Integer>>> possiblePrices = new HashMap<>();
 
         int bestPossiblePrice = 0;
         int cardsCountToTake = 0;
@@ -30,44 +32,86 @@ public class ChooseForMe {
                 Card card = sortedCards.get(cardNumber);
                 if (cardNumber == 0) {
                     if (card.getPrice() <= currentPrice) {
-                        HashMap<Integer, Integer> priceForCards = new HashMap<>();
-                        priceForCards.put(cardNumber, card.getPrice());
+                        HashMap<Integer, Map<Integer, Integer>> priceForCards = new HashMap<>();
+                        HashMap<Integer, Integer> specialCountToPrice = new HashMap<>();
+                        if (card.getCardType() == REGULAR) {
+                            specialCountToPrice.put(0, card.getPrice());
+                        } else {
+                            specialCountToPrice.put(1, card.getPrice());
+                        }
+                        priceForCards.put(cardNumber, specialCountToPrice);
                         possiblePrices.put(currentPrice, priceForCards);
                     }
                 } else {
-                    int doNotTake = safeGet(possiblePrices, currentPrice, cardNumber - 1);
+                    Map<Integer, Integer> doNotTakeMap = safeGet(possiblePrices, currentPrice, cardNumber - 1);
                     int priceWithoutCurrentCard = currentPrice - card.getPrice();
-                    if (priceWithoutCurrentCard > 0) {
-                        int take = safeGet(possiblePrices, priceWithoutCurrentCard, cardNumber - 1) + card.getPrice();
-                        bestPossiblePrice = Math.max(doNotTake, take);
+                    if (priceWithoutCurrentCard >= 0) {
+                        Map<Integer, Integer> availablePricesWithoutCurrent = safeGet(possiblePrices, priceWithoutCurrentCard, cardNumber - 1);
+                        Map<Integer, Integer> currentPrices = new HashMap<>();
+
+                        if (card.getCardType() == REGULAR) {
+                            for (int specialCardsCount = 0; specialCardsCount < cardNumber; specialCardsCount++) {
+                                int doNotTakePrice = doNotTakeMap.getOrDefault(specialCardsCount, 0);
+                                int takePrice = availablePricesWithoutCurrent.getOrDefault(specialCardsCount, 0) + card.getPrice();
+                                if (takePrice <= currentPrice) {
+                                    bestPossiblePrice = Math.max(doNotTakePrice, takePrice);
+                                    currentPrices.put(specialCardsCount, bestPossiblePrice);
+                                } else {
+                                    currentPrices.put(specialCardsCount, doNotTakePrice);
+                                }
+                            }
+                        } else {
+                            int doNotTakePrice = doNotTakeMap.getOrDefault(0, 0);
+                            currentPrices.put(0, doNotTakePrice);
+                            for (int specialCardsCount = 0; specialCardsCount < cardNumber; specialCardsCount++) {
+                                doNotTakePrice = doNotTakeMap.getOrDefault(specialCardsCount + 1, 0);
+                                int takePrice = availablePricesWithoutCurrent.getOrDefault(specialCardsCount, 0) + card.getPrice();
+                                if (takePrice <= currentPrice) {
+                                    bestPossiblePrice = Math.max(doNotTakePrice, takePrice);
+                                    currentPrices.put(specialCardsCount + 1, bestPossiblePrice);
+                                } else {
+                                    doNotTakePrice = doNotTakeMap.getOrDefault(specialCardsCount, 0);
+                                    if (doNotTakePrice > currentPrices.getOrDefault(specialCardsCount, doNotTakePrice)) {
+                                        currentPrices.put(specialCardsCount, doNotTakePrice);
+                                    }
+                                }
+                            }
+                        }
+                        safePut(possiblePrices, currentPrice, cardNumber, currentPrices);
+
+                        if (currentPrices.getOrDefault(specialWheel.getSpecialCardsCount(), 0) == maxPrice) {
+                            cardsCountToTake = cardNumber;
+                            break;
+                        }
                     } else {
-                        bestPossiblePrice = doNotTake;
+                        safePut(possiblePrices, currentPrice, cardNumber, doNotTakeMap);
                     }
-                    possiblePrices = safePut(possiblePrices, currentPrice, cardNumber, bestPossiblePrice);
                 }
             }
-            if (bestPossiblePrice == maxPrice) {
-                cardsCountToTake = cardNumber;
-                break;
-            }
         }
 
-        System.out.println("Prices:");
-        for (int card = 0; card < cards.size(); card++) {
-            for (int price = 1; price < maxPrice; price++) {
-                System.out.print(safeGet(possiblePrices, price, card) + " ");
-            }
-            System.out.println();
-        }
+        System.out.println("Prices: " + possiblePrices);
 
-        if (bestPossiblePrice == maxPrice) {
+        if (cardsCountToTake > 0) {
             int leftPrice = bestPossiblePrice;
+            int leftSpecialCardsCount = safeGet(possiblePrices, leftPrice, cardsCountToTake).entrySet()
+                .stream()
+                .filter(specialToPrice -> specialToPrice.getValue() == maxPrice)
+                .findAny()
+                .get()
+                .getKey();
             List<Card> result = new ArrayList<>();
             while (leftPrice > 0) {
-                if (safeGet(possiblePrices, bestPossiblePrice, cardsCountToTake) != maxPrice) {
-                    Card takenCard = cards.get(cardsCountToTake);
-                    leftPrice -= takenCard.getPrice();
-                    result.add(takenCard);
+                Card takenCard = cards.get(cardsCountToTake);
+                if (takenCard.getCardType() == REGULAR) {
+                    if (safeGet(possiblePrices, bestPossiblePrice, cardsCountToTake).get(leftSpecialCardsCount) != leftPrice) {
+                        leftPrice -= takenCard.getPrice();
+                    }
+                } else {
+                    if (safeGet(possiblePrices, bestPossiblePrice, cardsCountToTake).get(leftSpecialCardsCount - 1) != leftPrice) {
+                        leftPrice -= takenCard.getPrice();
+                        leftSpecialCardsCount--;
+                    }
                 }
                 cardsCountToTake--;
             }
@@ -84,17 +128,15 @@ public class ChooseForMe {
             .collect(toList());
     }
 
-    private int safeGet(Map<Integer, Map<Integer, Integer>> possiblePrices, int price, int cardNumber) {
-        Map<Integer, Integer> priceForCards = possiblePrices.get(price);
-        if (priceForCards == null) {
-            return 0;
-        }
-        return priceForCards.getOrDefault(cardNumber, 0);
+    private Map<Integer, Integer> safeGet(Map<Integer, Map<Integer, Map<Integer, Integer>>> possiblePrices, int price, int cardNumber) {
+        return Optional.ofNullable(possiblePrices.get(price))
+            .map(priceForCards -> priceForCards.get(cardNumber))
+            .orElse(new HashMap<>());
     }
 
-    private Map<Integer, Map<Integer, Integer>> safePut(Map<Integer, Map<Integer, Integer>> possiblePrices, int price, int cardNumber, int priceToPut) {
-        Map<Integer, Integer> priceForCards = possiblePrices.getOrDefault(price, new HashMap<>());
-        priceForCards.put(cardNumber, priceToPut);
+    private Map<Integer, Map<Integer, Map<Integer, Integer>>> safePut(Map<Integer, Map<Integer, Map<Integer, Integer>>> possiblePrices, int price, int cardNumber, Map<Integer, Integer> pricesToPut) {
+        Map<Integer, Map<Integer, Integer>> priceForCards = possiblePrices.getOrDefault(price, new HashMap<>());
+        priceForCards.put(cardNumber, pricesToPut);
         possiblePrices.put(price, priceForCards);
         return possiblePrices;
     }

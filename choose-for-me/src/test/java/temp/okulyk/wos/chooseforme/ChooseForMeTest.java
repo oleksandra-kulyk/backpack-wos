@@ -38,7 +38,7 @@ public class ChooseForMeTest {
 
         List<Card> result = chooseForMe.findCards(cards, readRegularWheel(lines.get(0)), readSpecialWheel(lines.get(1)));
 
-        assertEquals(new HashSet<>(result), new HashSet<>(readCards(readLines("test2.out"), 0)));
+        assertEquals(new HashSet<>(readCards(readLines("test2.out"), 0)), new HashSet<>(result));
     }
 
     private List<String> readLines(String fileName) throws IOException {
