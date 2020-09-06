@@ -28,11 +28,11 @@ public class ChooseForMe {
 
         int targetPrice = possiblePrices.get(cardsCountToTake).get(maxPrice).get(specialWheel.getSpecialCardsCount());
 
-        return findCardsToTakeFromTable(specialWheel, sortedCards, maxPrice, possiblePrices, cardsCountToTake, targetPrice);
+        return findCardsToTakeFromTable(specialWheel, sortedCards, possiblePrices, cardsCountToTake, targetPrice);
     }
 
-    private List<Card> findCardsToTakeFromTable(SpecialWheel specialWheel, List<Card> sortedCards, int maxPrice, Map<Integer, Map<Integer, Map<Integer, Integer>>> possiblePrices, int cardsCountToTake, int targetPrice) {
-        int leftPrice = maxPrice;
+    private List<Card> findCardsToTakeFromTable(SpecialWheel specialWheel, List<Card> sortedCards, Map<Integer, Map<Integer, Map<Integer, Integer>>> possiblePrices, int cardsCountToTake, int targetPrice) {
+        int leftPrice = targetPrice;
         int leftSpecialCardsCount = specialWheel.getSpecialCardsCount();
         List<Card> result = new ArrayList<>();
         while (leftPrice > 0) {
@@ -42,8 +42,9 @@ public class ChooseForMe {
                 return result;
             }
 
-            if (takeCurrentCard(possiblePrices, cardsCountToTake, targetPrice, leftPrice, leftSpecialCardsCount)) {
-                leftPrice = addTakenCardToResult(leftPrice, result, takenCard);
+            if (takeCurrentCard(possiblePrices, cardsCountToTake, leftPrice, leftSpecialCardsCount)) {
+                leftPrice -= takenCard.getPrice();
+                result.add(takenCard);
             }
             if (takenCard.getCardType() == SPECIAL) {
                 leftSpecialCardsCount--;
@@ -53,15 +54,8 @@ public class ChooseForMe {
         return result;
     }
 
-    private int addTakenCardToResult(int leftPrice, List<Card> result, Card takenCard) {
-        leftPrice -= takenCard.getPrice();
-        result.add(takenCard);
-        return leftPrice;
-    }
-
-    private boolean takeCurrentCard(Map<Integer, Map<Integer, Map<Integer, Integer>>> possiblePrices, int cardsCountToTake, int targetPrice, int leftPrice,
-                                    int leftSpecialCardsCount) {
-        return safeGet(possiblePrices, cardsCountToTake - 1, targetPrice).get(leftSpecialCardsCount) != leftPrice;
+    private boolean takeCurrentCard(Map<Integer, Map<Integer, Map<Integer, Integer>>> possiblePrices, int cardsCountToTake, int leftPrice, int leftSpecialCardsCount) {
+        return safeGet(possiblePrices, cardsCountToTake - 1, leftPrice).get(leftSpecialCardsCount) != leftPrice;
     }
 
     private List<Card> sortCards(List<Card> cards) {
@@ -99,9 +93,9 @@ public class ChooseForMe {
                     Map<Integer, Integer> currentPrices = new HashMap<>();
 
                     if (card.getCardType() == REGULAR) {
-                        calculateForRegular(cardNumber, currentPrice, card, doNotTakeMap, availablePricesWithoutCurrent, currentPrices);
+                        calculateForRegular(currentPrice, card, doNotTakeMap, availablePricesWithoutCurrent, currentPrices);
                     } else {
-                        calculateForSpecial(cardNumber, currentPrice, card, doNotTakeMap, availablePricesWithoutCurrent, currentPrices);
+                        calculateForSpecial(currentPrice, card, doNotTakeMap, availablePricesWithoutCurrent, currentPrices);
                     }
                     possiblePrices = safePut(possiblePrices, cardNumber, currentPrice, currentPrices);
 
@@ -118,11 +112,13 @@ public class ChooseForMe {
         return possiblePrices;
     }
 
-    private void calculateForSpecial(int cardNumber, int currentPrice, Card card, Map<Integer, Integer> doNotTakeMap,
+    private void calculateForSpecial(int currentPrice, Card card, Map<Integer, Integer> doNotTakeMap,
                                      Map<Integer, Integer> availablePricesWithoutCurrent, Map<Integer, Integer> currentPrices) {
+        int maxPossibleSpecialCards = max(getMaxSpecialCardsCount(doNotTakeMap), getMaxSpecialCardsCount(availablePricesWithoutCurrent));
+
         int doNotTakePrice = doNotTakeMap.getOrDefault(0, 0);
         currentPrices.put(0, doNotTakePrice);
-        for (int specialCardsCount = 0; specialCardsCount < cardNumber; specialCardsCount++) {
+        for (int specialCardsCount = 0; specialCardsCount <= maxPossibleSpecialCards; specialCardsCount++) {
             doNotTakePrice = doNotTakeMap.getOrDefault(specialCardsCount + 1, 0);
             int takePrice = availablePricesWithoutCurrent.getOrDefault(specialCardsCount, 0) + card.getPrice();
             if (ableToTakeCard(currentPrice, takePrice)) {
@@ -135,9 +131,11 @@ public class ChooseForMe {
         }
     }
 
-    private void calculateForRegular(int cardNumber, int currentPrice, Card card, Map<Integer, Integer> doNotTakeMap,
+    private void calculateForRegular(int currentPrice, Card card, Map<Integer, Integer> doNotTakeMap,
                                      Map<Integer, Integer> availablePricesWithoutCurrent, Map<Integer, Integer> currentPrices) {
-        for (int specialCardsCount = 0; specialCardsCount <= cardNumber; specialCardsCount++) {
+        int maxPossibleSpecialCards = max(getMaxSpecialCardsCount(doNotTakeMap), getMaxSpecialCardsCount(availablePricesWithoutCurrent));
+
+        for (int specialCardsCount = 0; specialCardsCount <= maxPossibleSpecialCards; specialCardsCount++) {
             int doNotTakePrice = doNotTakeMap.getOrDefault(specialCardsCount, 0);
             int takePrice = availablePricesWithoutCurrent.getOrDefault(specialCardsCount, 0) + card.getPrice();
             if (ableToTakeCard(currentPrice, takePrice)) {
@@ -148,6 +146,10 @@ public class ChooseForMe {
         }
     }
 
+    private int getMaxSpecialCardsCount(Map<Integer, Integer> pricesPerSpecial) {
+        return pricesPerSpecial.keySet().stream().max(Integer::compareTo).orElseGet(() -> 0);
+    }
+
     private boolean ableToTakeCard(int currentPrice, int takePrice) {
         return takePrice <= currentPrice;
     }
@@ -155,4 +157,5 @@ public class ChooseForMe {
     private boolean optionWithoutThisCardExist(int priceWithoutCurrentCard) {
         return priceWithoutCurrentCard >= 0;
     }
+
 }
