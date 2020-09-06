@@ -4,8 +4,9 @@ import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Paths;
 import java.util.ArrayList;
-import java.util.HashSet;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 
 import org.junit.Test;
 import temp.okulyk.wos.chooseforme.model.card.Card;
@@ -13,7 +14,11 @@ import temp.okulyk.wos.chooseforme.model.card.CardType;
 import temp.okulyk.wos.chooseforme.model.wheel.RegularWheel;
 import temp.okulyk.wos.chooseforme.model.wheel.SpecialWheel;
 
+import static java.lang.Integer.parseInt;
+import static java.lang.Long.parseLong;
 import static java.util.Arrays.stream;
+import static java.util.stream.Collectors.counting;
+import static java.util.stream.Collectors.groupingBy;
 import static java.util.stream.Collectors.toList;
 import static org.junit.Assert.assertEquals;
 
@@ -27,8 +32,9 @@ public class ChooseForMeTest {
         List<Card> cards = readCards(lines, 2);
 
         List<Card> result = chooseForMe.findCards(cards, readRegularWheel(lines.get(0)), readSpecialWheel(lines.get(1)));
+        Map<String, Long> cardsCount = countCards(result);
 
-        assertEquals(new HashSet<>(result), new HashSet<>(readCards(readLines("test1.out"), 0)));
+        assertEquals(readCardsResult(readLines("test1.out")), cardsCount);
     }
 
     @Test
@@ -37,8 +43,9 @@ public class ChooseForMeTest {
         List<Card> cards = readCards(lines, 2);
 
         List<Card> result = chooseForMe.findCards(cards, readRegularWheel(lines.get(0)), readSpecialWheel(lines.get(1)));
+        Map<String, Long> cardsCount = countCards(result);
 
-        assertEquals(new HashSet<>(readCards(readLines("test2.out"), 0)), new HashSet<>(result));
+        assertEquals(readCardsResult(readLines("test2.out")), cardsCount);
     }
 
     private List<String> readLines(String fileName) throws IOException {
@@ -51,9 +58,9 @@ public class ChooseForMeTest {
             String line = lines.get(i);
             String[] values = line.split(" ");
             String cardName = values[0];
-            int rarity = Integer.parseInt(values[1]);
+            int rarity = parseInt(values[1]);
             CardType cardType = CardType.valueOf(values[2]);
-            int count = Integer.parseInt(values[3]);
+            int count = parseInt(values[3]);
             for (int j = 0; j < count; j++) {
                 cards.add(new Card(cardName, rarity, cardType, j));
             }
@@ -70,6 +77,20 @@ public class ChooseForMeTest {
     }
 
     private SpecialWheel readSpecialWheel(String line) {
-        return new SpecialWheel(Integer.parseInt(line));
+        return new SpecialWheel(parseInt(line));
+    }
+
+    private Map<String, Long> readCardsResult(List<String> lines) {
+        Map<String, Long> result = new HashMap<>();
+        for (String line : lines) {
+            String[] split = line.split(" ");
+            result.put(split[0], parseLong(split[1]));
+        }
+        return result;
+    }
+
+    private Map<String, Long> countCards(List<Card> cards) {
+        return cards.stream()
+            .collect(groupingBy(Card::getCardName, counting()));
     }
 }
